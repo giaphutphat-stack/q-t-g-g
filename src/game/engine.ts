@@ -67,3 +67,28 @@ export function getTopWeaknessTag(tagCounts: Record<string, number>): string {
   entries.sort((a, b) => b[1] - a[1]);
   return entries[0][0];
 }
+
+/**
+ * Computes the micro-drill status banner HTML and class while always preserving #drill-matched-count
+ */
+export function buildMicroDrillBannerState(matchedCount: number, totalCount = 3): {
+  className: string;
+  innerHTML: string;
+  isComplete: boolean;
+} {
+  const safeTotal = totalCount > 0 ? totalCount : 3;
+  const isComplete = matchedCount >= safeTotal && safeTotal > 0;
+  if (isComplete) {
+    return {
+      isComplete: true,
+      className: 'p-3 rounded-xl bg-emerald-100 text-emerald-900 text-xs font-extrabold text-center',
+      innerHTML: `🎉 全部配对成功（已配对 <span id="drill-matched-count">${matchedCount}</span> / ${safeTotal}）！已彻底掌握本关同义替换考点，正在解锁下一关...`,
+    };
+  }
+  return {
+    isComplete: false,
+    className: 'p-3 rounded-xl bg-indigo-50 text-indigo-900 text-xs font-bold text-center',
+    innerHTML: `请配对全部 ${safeTotal} 组核心同义替换（已配对 <span id="drill-matched-count">${matchedCount}</span> / ${safeTotal}）`,
+  };
+}
+

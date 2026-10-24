@@ -1,6 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeEndpoint, cleanAndParseJSON, getTopWeaknessTag } from './engine';
+import {
+  normalizeEndpoint,
+  cleanAndParseJSON,
+  getTopWeaknessTag,
+  buildMicroDrillBannerState,
+} from './engine';
 
 test('normalizeEndpoint appends /v1/chat/completions when missing', () => {
   assert.equal(normalizeEndpoint('https://www.inroi.shop'), 'https://www.inroi.shop/v1/chat/completions');
@@ -41,3 +46,18 @@ test('getTopWeaknessTag returns highest frequency tag or default', () => {
     '#NG过度推理'
   );
 });
+
+test('buildMicroDrillBannerState preserves #drill-matched-count in both progress and completed states', () => {
+  const progress = buildMicroDrillBannerState(1, 3);
+  assert.equal(progress.isComplete, false);
+  assert.ok(progress.innerHTML.includes('id="drill-matched-count">1</span>'));
+
+  const done = buildMicroDrillBannerState(3, 3);
+  assert.equal(done.isComplete, true);
+  assert.ok(done.innerHTML.includes('id="drill-matched-count">3</span>'));
+
+  const reopened = buildMicroDrillBannerState(0, 3);
+  assert.equal(reopened.isComplete, false);
+  assert.ok(reopened.innerHTML.includes('id="drill-matched-count">0</span>'));
+});
+

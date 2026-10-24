@@ -1461,6 +1461,8 @@
       shuffledRight: [],
       timerSeconds: 30,
       timerHandle: null,
+      openDelayHandle: null,
+      finishDelayHandle: null,
       autoAdvanceAfterDrill: false
     };
 
@@ -1518,6 +1520,14 @@
     }
 
     function resetSandboxForLevel() {
+      if (drillState.openDelayHandle) {
+        clearTimeout(drillState.openDelayHandle);
+        drillState.openDelayHandle = null;
+      }
+      if (drillState.finishDelayHandle) {
+        clearTimeout(drillState.finishDelayHandle);
+        drillState.finishDelayHandle = null;
+      }
       sandboxState = {
         lockedKeywords: [],
         lockedEvidenceIndex: null,
@@ -1942,9 +1952,11 @@
         markLevelCompletedAndCheckAutoGen(lvl.id);
       } else {
         playSound("error");
-        // 答错自动展开三级精析并在 1.2 秒后弹出 30 秒靶向微练习
+        // 答错自动展开三级精析并在 0.9 秒后弹出 30 秒靶向微练习
         sandboxState.hintTierOpened = 3;
-        setTimeout(() => {
+        if (drillState.openDelayHandle) clearTimeout(drillState.openDelayHandle);
+        drillState.openDelayHandle = setTimeout(() => {
+          drillState.openDelayHandle = null;
           openMicroDrillModal(false);
         }, 900);
       }
@@ -2037,6 +2049,14 @@
      ********************************************************************/
     function openMicroDrillModal(autoAdvance) {
       playSound("click");
+      if (drillState.openDelayHandle) {
+        clearTimeout(drillState.openDelayHandle);
+        drillState.openDelayHandle = null;
+      }
+      if (drillState.finishDelayHandle) {
+        clearTimeout(drillState.finishDelayHandle);
+        drillState.finishDelayHandle = null;
+      }
       const lvl = getCurrentLevel();
       const pairs = lvl.microDrill || [];
       drillState.selectedLeftIdx = null;
@@ -2047,27 +2067,59 @@
         .map((p, idx) => ({ text: p.right, zh: p.zh, origIdx: idx }))
         .sort(() => Math.random() - 0.5);
 
-      document.getElementById("modal-micro-drill").classList.remove("hidden");
+      const timerEl = document.getElementById("drill-timer");
+      if (timerEl) timerEl.textContent = drillState.timerSeconds + "s";
+
+      const modalEl = document.getElementById("modal-micro-drill");
+      if (modalEl) modalEl.classList.remove("hidden");
       renderMicroDrillItems();
 
       if (drillState.timerHandle) clearInterval(drillState.timerHandle);
       drillState.timerHandle = setInterval(() => {
         if (drillState.timerSeconds > 0) {
           drillState.timerSeconds--;
-          document.getElementById("drill-timer").textContent = drillState.timerSeconds + "s";
+          const tEl = document.getElementById("drill-timer");
+          if (tEl) tEl.textContent = drillState.timerSeconds + "s";
         }
       }, 1000);
     }
 
     function closeMicroDrillModal() {
-      if (drillState.timerHandle) clearInterval(drillState.timerHandle);
-      document.getElementById("modal-micro-drill").classList.add("hidden");
+      if (drillState.timerHandle) {
+        clearInterval(drillState.timerHandle);
+        drillState.timerHandle = null;
+      }
+      if (drillState.openDelayHandle) {
+        clearTimeout(drillState.openDelayHandle);
+        drillState.openDelayHandle = null;
+      }
+      if (drillState.finishDelayHandle) {
+        clearTimeout(drillState.finishDelayHandle);
+        drillState.finishDelayHandle = null;
+      }
+      const modalEl = document.getElementById("modal-micro-drill");
+      if (modalEl) modalEl.classList.add("hidden");
     }
 
     function renderMicroDrillItems() {
       const lvl = getCurrentLevel();
       const pairs = lvl.microDrill || [];
-      document.getElementById("drill-matched-count").textContent = drillState.matchedLeftIndices.length;
+      const totalCount = pairs.length || 3;
+      const matchedCount = drillState.matchedLeftIndices.length;
+
+      const banner = document.getElementById("drill-status-banner");
+      if (banner) {
+        if (matchedCount >= totalCount && totalCount > 0) {
+          banner.className = "p-3 rounded-xl bg-emerald-100 text-emerald-900 text-xs font-extrabold text-center";
+          banner.innerHTML = `🎉 全部配对成功（已配对 <span id="drill-matched-count">${matchedCount}</span> / ${totalCount}）！已彻底掌握本关同义替换考点，正在解锁下一关...`;
+        } else {
+          banner.className = "p-3 rounded-xl bg-indigo-50 text-indigo-900 text-xs font-bold text-center";
+          banner.innerHTML = `请配对全部 ${totalCount} 组核心同义替换（已配对 <span id="drill-matched-count">${matchedCount}</span> / ${totalCount}）`;
+        }
+      } else {
+        const countEl = document.getElementById("drill-matched-count");
+        if (countEl) countEl.textContent = String(matchedCount);
+      }
 
       const leftHtml = pairs.map((p, idx) => {
         const isMatched = drillState.matchedLeftIndices.includes(idx);
@@ -2108,8 +2160,10 @@
         `;
       }).join("");
 
-      document.getElementById("drill-left-col").innerHTML = leftHtml;
-      document.getElementById("drill-right-col").innerHTML = rightHtml;
+      const leftCol = document.getElementById("drill-left-col");
+      const rightCol = document.getElementById("drill-right-col");
+      if (leftCol) leftCol.innerHTML = leftHtml;
+      if (rightCol) rightCol.innerHTML = rightHtml;
     }
 
     function selectDrillLeft(idx) {
@@ -2125,7 +2179,9 @@
       }
       if (drillState.selectedLeftIdx === origIdx) {
         playSound("correct");
-        drillState.matchedLeftIndices.push(origIdx);
+        if (!drillState.matchedLeftIndices.includes(origIdx)) {
+          drillState.matchedLeftIndices.push(origIdx);
+        }
         drillState.selectedLeftIdx = null;
         renderMicroDrillItems();
 
@@ -2133,10 +2189,9 @@
         if (drillState.matchedLeftIndices.length >= (lvl.microDrill || []).length) {
           sandboxState.microDrillCompleted = true;
           markLevelCompletedAndCheckAutoGen(lvl.id);
-          const banner = document.getElementById("drill-status-banner");
-          banner.className = "p-3 rounded-xl bg-emerald-100 text-emerald-900 text-xs font-extrabold text-center";
-          banner.textContent = "🎉 全部配对成功！已彻底掌握本关同义替换考点，正在解锁下一关...";
-          setTimeout(() => {
+          if (drillState.finishDelayHandle) clearTimeout(drillState.finishDelayHandle);
+          drillState.finishDelayHandle = setTimeout(() => {
+            drillState.finishDelayHandle = null;
             closeMicroDrillModal();
             if (drillState.autoAdvanceAfterDrill) {
               advanceToNextLevel();
