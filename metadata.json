@@ -1,0 +1,6 @@
+{
+  "name": "雅思环球探索：解谜大冒险 | IELTS Quest",
+  "description": "面向雅思备考者的 iPad 端环球探索解谜闯关游戏，覆盖听说读写四大高频考点，内置三级战术支援与随身语料库。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
